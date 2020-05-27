@@ -6,13 +6,11 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();
-// app.use(cors());
+app.use(cors());
 app.use(bodyParser.json());
 
-
-
 // Postgres Client Setup
-const { Pool, Client } = require('pg');
+const { Pool } = require('pg');
 const pgClient = new Pool({
   user: keys.pgUser,
   host: keys.pgHost,
@@ -37,16 +35,14 @@ const redisPublisher = redisClient.duplicate();
 
 // Express route handlers
 
-// app.get('/', (req, res) => {
-//   res.send('Hi');
-// });
+app.get('/', (req, res) => {
+  res.send('Hi');
+});
 
 app.get('/values/all', async (req, res) => {
+  const values = await pgClient.query('SELECT * from values');
 
-  const {rows} = await pgClient.query('SELECT * from values');
-  console.log('DATA IN POSTGRES', rows)
-
-  res.send(rows);
+  res.send(values.rows);
 });
 
 app.get('/values/current', async (req, res) => {
@@ -55,15 +51,7 @@ app.get('/values/current', async (req, res) => {
   });
 });
 
-
-app.post('/data', (req,res) => {
-  res.send(req.body.data)
-})
-
-app.post('/values', (req, res) => {
-
-  console.log("FORM DATA", req.body)
-
+app.post('/values', async (req, res) => {
   const index = req.body.index;
 
   if (parseInt(index) > 40) {
@@ -72,16 +60,9 @@ app.post('/values', (req, res) => {
 
   redisClient.hset('values', index, 'Nothing yet!');
   redisPublisher.publish('insert', index);
-  pgClient.query('INSERT INTO values(number) VALUES($1)', [index], (err,ress) => {
-    if(err){
-      console.log("PG ERROR ON INSERT")
-    } else {
-      console.log('PG DATA', ress.rows[0])
-      res.send({ working: true });
-    }
-  });
+  pgClient.query('INSERT INTO values(number) VALUES($1)', [index]);
 
-  
+  res.send({ working: true });
 });
 
 app.listen(5000, err => {
